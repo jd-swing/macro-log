@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Daily Log</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1a1a1a">
+
+<!-- iOS Safari "Add to Home Screen" support -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Macro Log">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Narrow:wght@500;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#1a1a1a;
+    --paper:#faf9f6;
+    --line:#1a1a1a;
+    --muted:#6b6b66;
+    --good:#2e6e62;
+    --over:#c77d22;
+    --card:#ffffff;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif;
+    padding:16px;
+    padding-bottom:60px;
+  }
+  .wrap{max-width:460px;margin:0 auto;}
+  h1{
+    font-family:'Archivo Narrow',sans-serif;
+    font-weight:800;
+    font-size:28px;
+    letter-spacing:-0.02em;
+    margin:4px 0 2px;
+  }
+  .date{
+    color:var(--muted);
+    font-size:13px;
+    margin-bottom:16px;
+  }
+
+  /* Nutrition-label style summary card */
+  .label-card{
+    background:var(--card);
+    border:3px solid var(--line);
+    padding:12px 14px 14px;
+    margin-bottom:18px;
+  }
+  .label-title{
+    font-family:'Archivo Narrow',sans-serif;
+    font-weight:800;
+    font-size:22px;
+    border-bottom:8px solid var(--line);
+    padding-bottom:4px;
+    margin-bottom:6px;
+  }
+  .thin-rule{border:none;border-top:1px solid var(--line);margin:6px 0;}
+  .thick-rule{border:none;border-top:5px solid var(--line);margin:8px 0;}
+  .row{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    font-size:15px;
+    padding:3px 0;
+  }
+  .row.total{
+    font-weight:700;
+    font-size:17px;
+  }
+  .row .amt{
+    font-family:'Archivo Narrow',sans-serif;
+    font-weight:700;
+  }
+  .row .goal{
+    color:var(--muted);
+    font-size:12px;
+    margin-left:6px;
+  }
+  .row .dir{
+    color:var(--muted);
+    font-size:11px;
+    font-weight:400;
+  }
+  .bar-track{
+    height:6px;
+    background:#e8e6e0;
+    border-radius:3px;
+    margin:3px 0 8px;
+    overflow:hidden;
+  }
+  .bar-fill{
+    height:100%;
+    background:var(--good);
+    border-radius:3px;
+  }
+  .bar-fill.over{background:var(--over);}
+
+  /* Log entries */
+  .section-label{
+    font-family:'Archivo Narrow',sans-serif;
+    font-weight:700;
+    font-size:13px;
+    text-transform:uppercase;
+    letter-spacing:0.08em;
+    color:var(--muted);
+    margin:18px 0 8px;
+  }
+  .entry{
+    background:var(--card);
+    border:1px solid #ddd8cf;
+    border-left:4px solid var(--ink);
+    padding:10px 12px;
+    margin-bottom:8px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .entry .name{font-weight:600;font-size:14px;}
+  .entry .macros{font-size:12px;color:var(--muted);margin-top:2px;}
+  .entry button{
+    background:none;
+    border:none;
+    color:#b33;
+    font-size:18px;
+    cursor:pointer;
+    padding:4px 8px;
+  }
+  .empty{
+    color:var(--muted);
+    font-size:13px;
+    padding:14px 0;
+    text-align:center;
+  }
+
+  /* Forms */
+  .card{
+    background:var(--card);
+    border:1px solid #ddd8cf;
+    padding:14px;
+    margin-bottom:12px;
+  }
+  .card h2{
+    font-family:'Archivo Narrow',sans-serif;
+    font-size:15px;
+    margin:0 0 10px;
+    font-weight:700;
+  }
+  .field-row{display:flex;gap:8px;margin-bottom:8px;}
+  input{
+    font-family:'Inter',sans-serif;
+    border:1px solid #cfcac0;
+    background:#fff;
+    padding:8px 10px;
+    font-size:14px;
+    border-radius:4px;
+    width:100%;
+  }
+  input:focus{outline:2px solid var(--ink);outline-offset:1px;}
+  .field-row input[data-w="wide"]{flex:2;}
+  .field-row input[data-w="narrow"]{flex:1;}
+  label{font-size:11px;color:var(--muted);display:block;margin-bottom:3px;}
+  button.primary{
+    width:100%;
+    background:var(--ink);
+    color:#fff;
+    border:none;
+    padding:11px;
+    font-size:14px;
+    font-weight:600;
+    border-radius:4px;
+    cursor:pointer;
+    font-family:'Inter',sans-serif;
+  }
+  button.primary:active{opacity:0.85;}
+  button.ghost{
+    width:100%;
+    background:none;
+    border:1px solid #cfcac0;
+    color:var(--ink);
+    padding:9px;
+    font-size:13px;
+    border-radius:4px;
+    cursor:pointer;
+    margin-top:6px;
+  }
+  .toggle-link{
+    text-align:center;
+    font-size:12px;
+    color:var(--muted);
+    text-decoration:underline;
+    cursor:pointer;
+    margin:14px 0 6px;
+  }
+  .hidden{display:none;}
+  .status{
+    font-size:11px;
+    color:var(--muted);
+    text-align:center;
+    margin-top:10px;
+  }
+
+  /* History calendar */
+  .cal-nav{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:8px;
+  }
+  .cal-nav button{
+    background:none;
+    border:1px solid #cfcac0;
+    border-radius:4px;
+    width:32px;
+    height:32px;
+    font-size:16px;
+    cursor:pointer;
+    color:var(--ink);
+  }
+  .cal-nav .month-label{
+    font-family:'Archivo Narrow',sans-serif;
+    font-weight:700;
+    font-size:15px;
+  }
+  .cal-grid{
+    display:grid;
+    grid-template-columns:repeat(7,1fr);
+    gap:4px;
+    background:var(--card);
+    border:1px solid #ddd8cf;
+    padding:10px;
+  }
+  .cal-dow{
+    text-align:center;
+    font-size:10px;
+    color:var(--muted);
+    font-weight:600;
+    padding-bottom:4px;
+  }
+  .cal-day{
+    aspect-ratio:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:12px;
+    border-radius:5px;
+    cursor:pointer;
+    position:relative;
+    background:transparent;
+    border:1px solid transparent;
+  }
+  .cal-day.blank{cursor:default;}
+  .cal-day.today{border-color:var(--ink);font-weight:700;}
+  .cal-day.has-log{background:#f0ece2;}
+  .cal-day.met-goal{background:var(--good);color:#fff;font-weight:600;}
+  .cal-day.under-goal{background:#fff;box-shadow:inset 0 0 0 2px var(--over);}
+  .cal-day.selected{outline:2px solid var(--ink);outline-offset:1px;}
+  .cal-legend{
+    display:flex;
+    gap:12px;
+    font-size:10px;
+    color:var(--muted);
+    margin:8px 0 4px;
+    flex-wrap:wrap;
+  }
+  .cal-legend span{display:flex;align-items:center;gap:4px;}
+  .dot{width:9px;height:9px;border-radius:3px;display:inline-block;}
+  .dot.met{background:var(--good);}
+  .dot.under{background:#fff;box-shadow:inset 0 0 0 2px var(--over);}
+  .dot.logged{background:#f0ece2;border:1px solid #ddd8cf;}
+  .day-detail{
+    background:var(--card);
+    border:1px solid #ddd8cf;
+    padding:10px 12px;
+    margin-top:8px;
+    font-size:12px;
+  }
+  .day-detail .dd-title{font-weight:700;margin-bottom:4px;}
+  .day-detail .dd-line{color:var(--muted);margin-bottom:2px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Daily Log</h1>
+  <div class="date" id="dateLabel">—</div>
+
+  <div class="label-card">
+    <div class="label-title">Today's Totals</div>
+
+    <div class="row total"><span>Calories <span class="dir">(max)</span></span><span class="amt" id="totCal">0</span></div>
+    <div class="bar-track"><div class="bar-fill" id="barCal"></div></div>
+
+    <hr class="thin-rule">
+
+    <div class="row"><span>Protein <span class="dir">(min)</span></span><span class="amt" id="totProtein">0g<span class="goal" id="goalProtein"></span></span></div>
+    <div class="bar-track"><div class="bar-fill" id="barProtein"></div></div>
+
+    <div class="row"><span>Carbs <span class="dir">(max)</span></span><span class="amt" id="totCarbs">0g<span class="goal" id="goalCarbs"></span></span></div>
+    <div class="bar-track"><div class="bar-fill" id="barCarbs"></div></div>
+
+    <div class="row"><span>Fat <span class="dir">(max)</span></span><span class="amt" id="totFat">0g<span class="goal" id="goalFat"></span></span></div>
+    <div class="bar-track"><div class="bar-fill" id="barFat"></div></div>
+
+    <div class="row"><span>Fiber <span class="dir">(min)</span></span><span class="amt" id="totFiber">0g<span class="goal" id="goalFiber"></span></span></div>
+    <div class="bar-track"><div class="bar-fill" id="barFiber"></div></div>
+
+    <hr class="thick-rule">
+    <div style="font-size:11px;color:var(--muted);">Goal: <span id="goalCalLine">not set</span> &nbsp;·&nbsp; <span class="toggle-link" id="editGoalsLink" style="display:inline;margin:0;">edit goals</span></div>
+  </div>
+
+  <div class="card hidden" id="goalsCard">
+    <h2>Set Daily Goals</h2>
+    <div class="field-row">
+      <div style="flex:1"><label>Calories</label><input type="number" id="gCal" placeholder="2000"></div>
+      <div style="flex:1"><label>Protein (g)</label><input type="number" id="gProtein" placeholder="150"></div>
+    </div>
+    <div class="field-row">
+      <div style="flex:1"><label>Carbs (g)</label><input type="number" id="gCarbs" placeholder="200"></div>
+      <div style="flex:1"><label>Fat (g)</label><input type="number" id="gFat" placeholder="65"></div>
+    </div>
+    <div class="field-row">
+      <div style="flex:1"><label>Fiber (g)</label><input type="number" id="gFiber" placeholder="28"></div>
+    </div>
+    <button class="primary" id="saveGoalsBtn">Save Goals</button>
+  </div>
+
+  <div class="section-label">Add Entry</div>
+  <div class="card">
+    <div class="field-row"><input type="text" id="fName" placeholder="Food / meal name" data-w="wide"></div>
+    <div class="field-row">
+      <div style="flex:1"><label>Calories</label><input type="number" id="fCal"></div>
+      <div style="flex:1"><label>Protein (g)</label><input type="number" id="fProtein"></div>
+    </div>
+    <div class="field-row">
+      <div style="flex:1"><label>Carbs (g)</label><input type="number" id="fCarbs"></div>
+      <div style="flex:1"><label>Fat (g)</label><input type="number" id="fFat"></div>
+    </div>
+    <div class="field-row">
+      <div style="flex:1"><label>Fiber (g)</label><input type="number" id="fFiber"></div>
+    </div>
+    <button class="primary" id="addBtn">Add to Today's Log</button>
+  </div>
+
+  <div class="section-label">Logged Today</div>
+  <div id="entryList"></div>
+
+  <div class="toggle-link" id="clearTodayLink">clear today's entries</div>
+
+  <div class="section-label">History</div>
+  <div class="cal-nav">
+    <button id="prevMonth" aria-label="Previous month">‹</button>
+    <div class="month-label" id="monthLabel">—</div>
+    <button id="nextMonth" aria-label="Next month">›</button>
+  </div>
+  <div class="cal-grid" id="calGrid"></div>
+  <div class="cal-legend">
+    <span><i class="dot met"></i> goal met</span>
+    <span><i class="dot under"></i> logged, under/over</span>
+    <span><i class="dot logged"></i> logged, no goal set</span>
+  </div>
+  <div class="day-detail hidden" id="dayDetail"></div>
+
+  <div class="status" id="statusLine"></div>
+
+  <div class="section-label">Backup / Sync</div>
+  <div class="card">
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">
+      This data lives only in this browser. Export a backup and save it into your iCloud Drive
+      folder to bring it over to your other device, then Import it there.
+    </div>
+    <button class="ghost" id="exportBtn">Export Backup (download file)</button>
+    <input type="file" id="importFile" accept="application/json" style="margin-top:8px;width:100%;">
+    <button class="ghost" id="importBtn">Import Backup from file</button>
+  </div>
+</div>
+
+<script>
+// Local, device-only storage shim that mimics window.storage's API but uses the browser's
+// built-in localStorage. No Claude account, no publishing, no gating - just this browser.
+const storage = {
+  async get(key){
+    const v = localStorage.getItem(key);
+    if(v === null) return null;
+    return {key, value:v, shared:false};
+  },
+  async set(key, value){
+    localStorage.setItem(key, value);
+    return {key, value, shared:false};
+  },
+  async delete(key){
+    localStorage.removeItem(key);
+    return {key, deleted:true, shared:false};
+  },
+  async list(prefix){
+    const keys = [];
+    for(let i=0;i<localStorage.length;i++){
+      const k = localStorage.key(i);
+      if(!prefix || k.startsWith(prefix)) keys.push(k);
+    }
+    return {keys, prefix, shared:false};
+  }
+};
+window.storage = storage; // keep the rest of the app's existing calls working unchanged
+
+const todayKey = () => {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+};
+const today = todayKey();
+document.getElementById('dateLabel').textContent = new Date().toLocaleDateString(undefined,{weekday:'long', month:'long', day:'numeric'});
+
+let entries = [];
+let goals = null;
+
+// Seed data: today's conversation-derived entries, only used the very first time storage is empty
+// Idempotent entry additions requested via chat. Safe to run on every load - each item
+// carries a unique id, so it's only ever added once per date, regardless of what else
+// is already in that day's log.
+const pendingAdditions = [
+  {date:'2026-08-04', entry:{id:'chat-2026-08-04-breakfast', name:'Premier Protein shake (breakfast)', calories:160, protein:30, carbs:4, fat:3, fiber:1}},
+  {date:'2026-08-04', entry:{id:'chat-2026-08-04-lunch1', name:'California BLT', calories:650, protein:20, carbs:48, fat:38, fiber:5}},
+  {date:'2026-08-04', entry:{id:'chat-2026-08-04-lunch2', name:"Lay's Sour Cream & Onion (small bag)", calories:160, protein:2, carbs:15, fat:10, fiber:1}},
+];
+
+async function applyPendingAdditions(){
+  const byDate = {};
+  pendingAdditions.forEach(p => {
+    if(!byDate[p.date]) byDate[p.date] = [];
+    byDate[p.date].push(p.entry);
+  });
+
+  for(const dateStr of Object.keys(byDate)){
+    let list;
+    try{
+      const res = await window.storage.get('entries:' + dateStr, false);
+      list = res && res.value ? JSON.parse(res.value) : [];
+    }catch(e){
+      list = [];
+    }
+    let changed = false;
+    byDate[dateStr].forEach(entry => {
+      if(!list.some(e => e.id === entry.id)){
+        list.push(entry);
+        changed = true;
+      }
+    });
+    if(changed){
+      try{ await window.storage.set('entries:' + dateStr, JSON.stringify(list), false); }catch(e){}
+    }
+  }
+}
+
+// Fixed historical data for 8/3, seeded independently of "today" so it can never be
+// accidentally overwritten by later changes to seedEntries above.
+const historicalSeeds = {
+  '2026-08-03': [
+    {id:'hist-2026-08-03-1', name:'Protein shake (breakfast)', calories:150, protein:30, carbs:3, fat:1, fiber:1},
+    {id:'hist-2026-08-03-2', name:'Cheerios (1.5 bowls) + whole milk', calories:350, protein:13, carbs:49, fat:12, fiber:3},
+    {id:'hist-2026-08-03-3', name:'CFA Grilled Nuggets (12ct)', calories:145, protein:25, carbs:2, fat:3, fiber:0},
+    {id:'hist-2026-08-03-4', name:'2 rice cakes', calories:70, protein:1.5, carbs:15, fat:0, fiber:1},
+    {id:'hist-2026-08-03-5', name:'Chick-fil-A sauce', calories:140, protein:0, carbs:4, fat:13, fiber:0},
+    {id:'hist-2026-08-03-6', name:'Protein shake (dinner)', calories:150, protein:30, carbs:3, fat:1, fiber:1},
+  ],
+};
+
+async function seedHistoricalDates(){
+  for(const dateStr of Object.keys(historicalSeeds)){
+    let existing = null;
+    try{
+      const res = await window.storage.get('entries:' + dateStr, false);
+      existing = res && res.value ? JSON.parse(res.value) : null;
+    }catch(e){
+      existing = null; // key doesn't exist yet
+    }
+    const isEmpty = !existing || !Array.isArray(existing) || existing.length === 0;
+    if(isEmpty){
+      try{
+        await window.storage.set('entries:' + dateStr, JSON.stringify(historicalSeeds[dateStr]), false);
+      }catch(e2){}
+    }
+  }
+}
+
+// Rough fiber-per-item lookup used to backfill entries logged before fiber tracking existed.
+// Matches on keywords in the entry name (lowercased). Falls back to 0 if nothing matches.
+function estimateFiber(name){
+  const n = name.toLowerCase();
+  if(n.includes('cheerio')) return n.includes('1.5') ? 3 : 2;
+  if(n.includes('rice cake')) return 1;
+  if(n.includes('nugget')) return 0;
+  if(n.includes('sauce')) return 0;
+  if(n.includes('shake')) return 1;
+  if(n.includes('bean')) return 15; // per can-ish serving, rough
+  if(n.includes('chicken') || n.includes('beef')) return 0;
+  if(n.includes('rice') && !n.includes('cake')) return 1;
+  if(n.includes('salad') || n.includes('broccoli') || n.includes('pepper') || n.includes('onion')) return 3;
+  if(n.includes('banana')) return 3;
+  return 0;
+}
+
+// One-time backfill: any entry (today or in history) missing a fiber field gets an estimate.
+async function migrateFiberForDay(dateStr, list){
+  let changed = false;
+  const patched = list.map(e=>{
+    if(e.fiber === undefined || e.fiber === null){
+      changed = true;
+      return {...e, fiber: estimateFiber(e.name)};
+    }
+    return e;
+  });
+  if(changed){
+    try{ await window.storage.set('entries:' + dateStr, JSON.stringify(patched), false); }catch(e){}
+  }
+  return patched;
+}
+
+async function loadData(){
+  await seedHistoricalDates();
+  await applyPendingAdditions();
+
+  try{
+    const res = await window.storage.get('entries:' + today, false);
+    entries = res && res.value ? JSON.parse(res.value) : null;
+  }catch(e){ entries = null; }
+
+  if(entries === null){
+    entries = historicalSeeds[today] || [];
+    await saveEntries();
+  } else {
+    entries = await migrateFiberForDay(today, entries);
+  }
+
+  try{
+    const gres = await window.storage.get('goals', false);
+    goals = gres && gres.value ? JSON.parse(gres.value) : null;
+  }catch(e){ goals = null; }
+
+  if(goals === null){
+    // first time - seed with calculated targets
+    goals = {calories:1850, protein:155, carbs:190, fat:60, fiber:28};
+    await saveGoals(goals);
+  } else if(goals.fiber === undefined){
+    goals.fiber = 28;
+    await saveGoals(goals);
+  }
+
+  if(goals){
+    document.getElementById('gCal').value = goals.calories || '';
+    document.getElementById('gProtein').value = goals.protein || '';
+    document.getElementById('gCarbs').value = goals.carbs || '';
+    document.getElementById('gFat').value = goals.fat || '';
+    document.getElementById('gFiber').value = goals.fiber || '';
+  }
+
+  render();
+}
+
+async function saveEntries(){
+  try{
+    await window.storage.set('entries:' + today, JSON.stringify(entries), false);
+  }catch(e){
+    setStatus('Could not save — try again');
+  }
+}
+
+async function saveGoals(g){
+  try{
+    await window.storage.set('goals', JSON.stringify(g), false);
+    goals = g;
+    setStatus('Goals saved');
+    render();
+  }catch(e){
+    setStatus('Could not save goals');
+  }
+}
+
+function setStatus(msg){
+  const el = document.getElementById('statusLine');
+  el.textContent = msg;
+  setTimeout(()=>{ if(el.textContent === msg) el.textContent = ''; }, 2500);
+}
+
+function sum(key){
+  return entries.reduce((a,e)=>a + (Number(e[key])||0), 0);
+}
+
+function pct(val, goal){
+  if(!goal) return 0;
+  return Math.min(100, Math.round((val/goal)*100));
+}
+
+function render(){
+  const cal = sum('calories'), pro = sum('protein'), carb = sum('carbs'), fat = sum('fat'), fiber = sum('fiber');
+
+  document.getElementById('totCal').textContent = cal;
+  document.getElementById('totProtein').innerHTML = pro + 'g' + (goals && goals.protein ? '<span class="goal">of '+goals.protein+'g</span>' : '');
+  document.getElementById('totCarbs').innerHTML = carb + 'g' + (goals && goals.carbs ? '<span class="goal">of '+goals.carbs+'g</span>' : '');
+  document.getElementById('totFat').innerHTML = fat + 'g' + (goals && goals.fat ? '<span class="goal">of '+goals.fat+'g</span>' : '');
+  document.getElementById('totFiber').innerHTML = fiber + 'g' + (goals && goals.fiber ? '<span class="goal">of '+goals.fiber+'g</span>' : '');
+
+  document.getElementById('goalCalLine').textContent = goals && goals.calories ? goals.calories + ' cal / ' + (goals.protein||'—') + 'g protein' : 'not set';
+
+  setBar('barCal', cal, goals ? goals.calories : null, true);
+  setBar('barProtein', pro, goals ? goals.protein : null, false);
+  setBar('barCarbs', carb, goals ? goals.carbs : null, true);
+  setBar('barFat', fat, goals ? goals.fat : null, true);
+  setBar('barFiber', fiber, goals ? goals.fiber : null, false);
+
+  const list = document.getElementById('entryList');
+  if(entries.length === 0){
+    list.innerHTML = '<div class="empty">Nothing logged yet today.</div>';
+  } else {
+    list.innerHTML = entries.map(e => `
+      <div class="entry">
+        <div>
+          <div class="name">${escapeHtml(e.name)}</div>
+          <div class="macros">${e.calories} cal · P ${e.protein}g · C ${e.carbs}g · F ${e.fat}g · Fiber ${e.fiber||0}g</div>
+        </div>
+        <button onclick="removeEntry('${e.id}')" aria-label="Remove entry">×</button>
+      </div>
+    `).join('');
+  }
+}
+
+function setBar(id, val, goal, isCeiling){
+  const bar = document.getElementById(id);
+  const p = goal ? pct(val, goal) : Math.min(100, val > 0 ? 40 : 0);
+  bar.style.width = p + '%';
+  // Only flag "over" for ceiling metrics (calories/carbs/fat). Protein is a floor -
+  // exceeding it isn't a problem, so it never gets the warning color.
+  bar.classList.toggle('over', isCeiling && goal && val > goal);
+}
+
+function escapeHtml(s){
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+window.removeEntry = async function(id){
+  entries = entries.filter(e => e.id !== id);
+  await saveEntries();
+  render();
+};
+
+document.getElementById('addBtn').addEventListener('click', async ()=>{
+  const name = document.getElementById('fName').value.trim();
+  const cal = Number(document.getElementById('fCal').value)||0;
+  const protein = Number(document.getElementById('fProtein').value)||0;
+  const carbs = Number(document.getElementById('fCarbs').value)||0;
+  const fat = Number(document.getElementById('fFat').value)||0;
+  const fiber = Number(document.getElementById('fFiber').value)||0;
+
+  if(!name){ setStatus('Give it a name first'); return; }
+
+  entries.push({id:'e-'+Date.now(), name, calories:cal, protein, carbs, fat, fiber});
+  await saveEntries();
+  render();
+
+  ['fName','fCal','fProtein','fCarbs','fFat','fFiber'].forEach(id => document.getElementById(id).value = '');
+  setStatus('Added');
+});
+
+document.getElementById('editGoalsLink').addEventListener('click', ()=>{
+  document.getElementById('goalsCard').classList.toggle('hidden');
+});
+
+document.getElementById('saveGoalsBtn').addEventListener('click', async ()=>{
+  const g = {
+    calories: Number(document.getElementById('gCal').value)||0,
+    protein: Number(document.getElementById('gProtein').value)||0,
+    carbs: Number(document.getElementById('gCarbs').value)||0,
+    fat: Number(document.getElementById('gFat').value)||0,
+    fiber: Number(document.getElementById('gFiber').value)||0,
+  };
+  await saveGoals(g);
+  document.getElementById('goalsCard').classList.add('hidden');
+});
+
+document.getElementById('clearTodayLink').addEventListener('click', async ()=>{
+  if(confirm('Clear all entries logged today?')){
+    entries = [];
+    await saveEntries();
+    render();
+  }
+});
+
+// ---- History calendar ----
+let calMonth = new Date(); // month currently displayed
+calMonth.setDate(1);
+let historyCache = {}; // dateStr -> {calories, protein, carbs, fat, fiber} or null if no log, reset on every page load
+let allLoggedKeys = null; // set of date strings that have entries, from storage.list
+let selectedDay = null;
+
+function dateStrFor(y,m,d){
+  return y + '-' + String(m+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+}
+
+async function fetchLoggedDateSet(){
+  try{
+    const res = await window.storage.list('entries:', false);
+    const keys = res && res.keys ? res.keys : [];
+    allLoggedKeys = new Set(keys.map(k => k.replace('entries:', '')));
+  }catch(e){
+    allLoggedKeys = new Set();
+  }
+}
+
+async function getDayTotals(dateStr){
+  if(historyCache[dateStr] !== undefined) return historyCache[dateStr];
+  if(!allLoggedKeys || !allLoggedKeys.has(dateStr)){
+    historyCache[dateStr] = null;
+    return null;
+  }
+  try{
+    const res = await window.storage.get('entries:' + dateStr, false);
+    let list = res && res.value ? JSON.parse(res.value) : [];
+    list = await migrateFiberForDay(dateStr, list);
+    const totals = {
+      calories: list.reduce((a,e)=>a+(Number(e.calories)||0),0),
+      protein: list.reduce((a,e)=>a+(Number(e.protein)||0),0),
+      carbs: list.reduce((a,e)=>a+(Number(e.carbs)||0),0),
+      fat: list.reduce((a,e)=>a+(Number(e.fat)||0),0),
+      fiber: list.reduce((a,e)=>a+(Number(e.fiber)||0),0),
+      entries: list,
+    };
+    historyCache[dateStr] = totals;
+    return totals;
+  }catch(e){
+    historyCache[dateStr] = null;
+    return null;
+  }
+}
+
+async function renderCalendar(){
+  if(!allLoggedKeys) await fetchLoggedDateSet();
+
+  const y = calMonth.getFullYear(), m = calMonth.getMonth();
+  document.getElementById('monthLabel').textContent = calMonth.toLocaleDateString(undefined,{month:'long', year:'numeric'});
+
+  const grid = document.getElementById('calGrid');
+  grid.innerHTML = '';
+  ['S','M','T','W','T','F','S'].forEach(d=>{
+    const el = document.createElement('div');
+    el.className = 'cal-dow';
+    el.textContent = d;
+    grid.appendChild(el);
+  });
+
+  const firstDow = new Date(y,m,1).getDay();
+  const daysInMonth = new Date(y,m+1,0).getDate();
+
+  for(let i=0;i<firstDow;i++){
+    const blank = document.createElement('div');
+    blank.className = 'cal-day blank';
+    grid.appendChild(blank);
+  }
+
+  for(let d=1; d<=daysInMonth; d++){
+    const dateStr = dateStrFor(y,m,d);
+    const cell = document.createElement('div');
+    cell.className = 'cal-day';
+    cell.textContent = d;
+    if(dateStr === today) cell.classList.add('today');
+    cell.addEventListener('click', ()=>selectDay(dateStr, cell));
+    grid.appendChild(cell);
+
+    getDayTotals(dateStr).then(totals=>{
+      if(!totals) return;
+      cell.classList.add('has-log');
+      if(goals && goals.protein && goals.calories){
+        const proteinMet = totals.protein >= goals.protein;
+        const calOk = totals.calories <= goals.calories * 1.1 && totals.calories >= goals.calories * 0.7;
+        if(proteinMet && calOk){
+          cell.classList.remove('has-log');
+          cell.classList.add('met-goal');
+        } else {
+          cell.classList.add('under-goal');
+        }
+      }
+    });
+  }
+}
+
+async function selectDay(dateStr, cellEl){
+  document.querySelectorAll('.cal-day.selected').forEach(el=>el.classList.remove('selected'));
+  if(cellEl) cellEl.classList.add('selected');
+  selectedDay = dateStr;
+
+  const totals = await getDayTotals(dateStr);
+  const panel = document.getElementById('dayDetail');
+  panel.classList.remove('hidden');
+
+  if(!totals){
+    panel.innerHTML = `<div class="dd-title">${dateStr}</div><div class="dd-line">Nothing logged this day.</div>`;
+    return;
+  }
+  const entryLines = totals.entries.map(e => `${e.name} — ${e.calories} cal, ${e.protein}g P`).join('<br>');
+  panel.innerHTML = `
+    <div class="dd-title">${dateStr}</div>
+    <div class="dd-line">${totals.calories} cal · ${totals.protein}g protein · ${totals.carbs}g carbs · ${totals.fat}g fat · ${totals.fiber||0}g fiber</div>
+    <div class="dd-line" style="margin-top:6px;">${entryLines || 'No items'}</div>
+  `;
+}
+
+document.getElementById('prevMonth').addEventListener('click', ()=>{
+  calMonth.setMonth(calMonth.getMonth()-1);
+  renderCalendar();
+});
+document.getElementById('nextMonth').addEventListener('click', ()=>{
+  calMonth.setMonth(calMonth.getMonth()+1);
+  renderCalendar();
+});
+
+// Refresh calendar's "today" cell state whenever today's entries change
+const _origSaveEntries = saveEntries;
+saveEntries = async function(){
+  await _origSaveEntries();
+  historyCache[today] = null;
+  if(allLoggedKeys) allLoggedKeys.add(today);
+  renderCalendar();
+};
+
+// ---- Backup: export / import ----
+document.getElementById('exportBtn').addEventListener('click', async ()=>{
+  const dump = {};
+  for(let i=0;i<localStorage.length;i++){
+    const k = localStorage.key(i);
+    dump[k] = localStorage.getItem(k);
+  }
+  const blob = new Blob([JSON.stringify(dump, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'macro-tracker-backup-' + today + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  setStatus('Backup downloaded - move it to iCloud Drive');
+});
+
+document.getElementById('importBtn').addEventListener('click', async ()=>{
+  const fileInput = document.getElementById('importFile');
+  const file = fileInput.files[0];
+  if(!file){ setStatus('Choose a backup file first'); return; }
+
+  try{
+    const text = await file.text();
+    const dump = JSON.parse(text);
+    Object.keys(dump).forEach(k => localStorage.setItem(k, dump[k]));
+    setStatus('Backup imported - reloading...');
+    historyCache = {};
+    allLoggedKeys = null;
+    await loadData();
+    await renderCalendar();
+    setStatus('Backup imported successfully');
+  }catch(e){
+    setStatus('Could not read that backup file');
+  }
+});
+
+loadData().then(renderCalendar);
+
+// Register service worker for offline support (silently no-ops if unsupported)
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
