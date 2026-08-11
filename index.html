@@ -166,6 +166,16 @@
   input:focus{outline:2px solid var(--ink);outline-offset:1px;}
   .field-row input[data-w="wide"]{flex:2;}
   .field-row input[data-w="narrow"]{flex:1;}
+  select{
+    font-family:'Inter',sans-serif;
+    border:1px solid #cfcac0;
+    background:#fff;
+    padding:8px 10px;
+    font-size:14px;
+    border-radius:4px;
+    width:100%;
+  }
+  select:focus{outline:2px solid var(--ink);outline-offset:1px;}
   label{font-size:11px;color:var(--muted);display:block;margin-bottom:3px;}
   button.primary{
     width:100%;
@@ -291,6 +301,47 @@
   <h1>Daily Log</h1>
   <div class="date" id="dateLabel">—</div>
 
+  <div class="card hidden" id="onboardingCard">
+    <h2>Suggest My Goals</h2>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">
+      Enter your height, weight, and a bit more, and we'll calculate calorie and macro targets for you. Or skip and set goals yourself.
+    </div>
+    <div class="field-row">
+      <div style="flex:1"><label>Sex</label>
+        <select id="pSex"><option value="male">Male</option><option value="female">Female</option></select>
+      </div>
+      <div style="flex:1"><label>Age</label><input type="number" id="pAge" placeholder="30"></div>
+    </div>
+    <div class="field-row">
+      <div style="flex:1"><label>Height (ft)</label><input type="number" id="pHeightFt" placeholder="5"></div>
+      <div style="flex:1"><label>Height (in)</label><input type="number" id="pHeightIn" placeholder="9"></div>
+      <div style="flex:1"><label>Weight (lb)</label><input type="number" id="pWeight" placeholder="170"></div>
+    </div>
+    <div class="field-row">
+      <div style="flex:1"><label>Activity Level</label>
+        <select id="pActivity">
+          <option value="1.2">Sedentary (little/no exercise)</option>
+          <option value="1.375">Light (1-3 days/week)</option>
+          <option value="1.55" selected>Moderate (3-5 days/week)</option>
+          <option value="1.725">Active (6-7 days/week)</option>
+          <option value="1.9">Very active (physical job/2x day)</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div style="flex:1"><label>Goal</label>
+        <select id="pGoal">
+          <option value="-500">Lose weight</option>
+          <option value="0" selected>Maintain weight</option>
+          <option value="300">Gain weight</option>
+        </select>
+      </div>
+    </div>
+    <button class="primary" id="calcGoalsBtn">Calculate My Goals</button>
+    <button class="ghost" id="manualGoalsBtn">I'll set my own goals</button>
+    <button class="ghost" id="useDefaultBtn">Skip — use a general default</button>
+  </div>
+
   <div class="label-card">
     <div class="label-title">Today's Totals</div>
 
@@ -312,7 +363,7 @@
     <div class="bar-track"><div class="bar-fill" id="barFiber"></div></div>
 
     <hr class="thick-rule">
-    <div style="font-size:11px;color:var(--muted);">Goal: <span id="goalCalLine">not set</span> &nbsp;·&nbsp; <span class="toggle-link" id="editGoalsLink" style="display:inline;margin:0;">edit goals</span></div>
+    <div style="font-size:11px;color:var(--muted);">Goal: <span id="goalCalLine">not set</span> &nbsp;·&nbsp; <span class="toggle-link" id="editGoalsLink" style="display:inline;margin:0;">edit goals</span> &nbsp;·&nbsp; <span class="toggle-link" id="recalcGoalsLink" style="display:inline;margin:0;">recalculate from profile</span></div>
   </div>
 
   <div class="card hidden" id="goalsCard">
@@ -418,6 +469,22 @@ document.getElementById('dateLabel').textContent = new Date().toLocaleDateString
 
 let entries = [];
 let goals = null;
+let profile = null;
+
+// Mifflin-St Jeor BMR -> TDEE -> calorie/macro targets from a height/weight/age/sex/activity profile.
+function computeGoalsFromProfile(p){
+  const heightCm = ((Number(p.heightFt)||0)*12 + (Number(p.heightIn)||0)) * 2.54;
+  const weightKg = (Number(p.weight)||0) * 0.453592;
+  const age = Number(p.age)||0;
+  const bmr = 10*weightKg + 6.25*heightCm - 5*age + (p.sex === 'female' ? -161 : 5);
+  const tdee = bmr * Number(p.activity);
+  const calories = Math.max(1200, Math.round((tdee + Number(p.goalAdjust)) / 10) * 10);
+  const protein = Math.round(Number(p.weight)||0); // ~1g per lb bodyweight
+  const fat = Math.round((calories*0.25)/9); // 25% of calories from fat
+  const carbs = Math.max(0, Math.round((calories - protein*4 - fat*9)/4));
+  const fiber = Math.round((calories/1000)*14); // IOM guideline: 14g per 1000 kcal
+  return {calories, protein, carbs, fat, fiber};
+}
 
 // Seed data: today's conversation-derived entries, only used the very first time storage is empty
 // Idempotent entry additions requested via chat. Safe to run on every load - each item
@@ -559,6 +626,31 @@ async function loadData(){
     document.getElementById('gFiber').value = goals.fiber || '';
   }
 
+  try{
+    const pres = await window.storage.get('profile', false);
+    profile = pres && pres.value ? JSON.parse(pres.value) : null;
+  }catch(e){ profile = null; }
+
+  if(profile){
+    document.getElementById('pSex').value = profile.sex || 'male';
+    document.getElementById('pAge').value = profile.age || '';
+    document.getElementById('pHeightFt').value = profile.heightFt || '';
+    document.getElementById('pHeightIn').value = profile.heightIn || '';
+    document.getElementById('pWeight').value = profile.weight || '';
+    document.getElementById('pActivity').value = profile.activity || '1.55';
+    document.getElementById('pGoal').value = profile.goalAdjust !== undefined ? profile.goalAdjust : '0';
+  }
+
+  let onboardingDismissed = false;
+  try{
+    const ores = await window.storage.get('onboardingDismissed', false);
+    onboardingDismissed = !!(ores && ores.value);
+  }catch(e){ onboardingDismissed = false; }
+
+  if(!onboardingDismissed){
+    document.getElementById('onboardingCard').classList.remove('hidden');
+  }
+
   render();
 }
 
@@ -670,6 +762,47 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
 
 document.getElementById('editGoalsLink').addEventListener('click', ()=>{
   document.getElementById('goalsCard').classList.toggle('hidden');
+});
+
+document.getElementById('recalcGoalsLink').addEventListener('click', ()=>{
+  document.getElementById('onboardingCard').classList.toggle('hidden');
+});
+
+async function dismissOnboarding(){
+  document.getElementById('onboardingCard').classList.add('hidden');
+  try{ await window.storage.set('onboardingDismissed', '1', false); }catch(e){}
+}
+
+document.getElementById('calcGoalsBtn').addEventListener('click', async ()=>{
+  const p = {
+    sex: document.getElementById('pSex').value,
+    age: Number(document.getElementById('pAge').value)||0,
+    heightFt: Number(document.getElementById('pHeightFt').value)||0,
+    heightIn: Number(document.getElementById('pHeightIn').value)||0,
+    weight: Number(document.getElementById('pWeight').value)||0,
+    activity: document.getElementById('pActivity').value,
+    goalAdjust: document.getElementById('pGoal').value,
+  };
+  if(!p.age || !p.weight || (!p.heightFt && !p.heightIn)){
+    setStatus('Fill in age, height, and weight first');
+    return;
+  }
+  profile = p;
+  try{ await window.storage.set('profile', JSON.stringify(profile), false); }catch(e){}
+  const g = computeGoalsFromProfile(profile);
+  await saveGoals(g);
+  await dismissOnboarding();
+  setStatus('Goals calculated from your profile');
+});
+
+document.getElementById('manualGoalsBtn').addEventListener('click', async ()=>{
+  await dismissOnboarding();
+  document.getElementById('goalsCard').classList.remove('hidden');
+});
+
+document.getElementById('useDefaultBtn').addEventListener('click', async ()=>{
+  await dismissOnboarding();
+  setStatus('Using general default goals');
 });
 
 document.getElementById('saveGoalsBtn').addEventListener('click', async ()=>{
