@@ -529,75 +529,6 @@ function computeGoalsFromProfile(p){
   return {calories, protein, carbs, fat, fiber};
 }
 
-// Seed data: today's conversation-derived entries, only used the very first time storage is empty
-// Idempotent entry additions requested via chat. Safe to run on every load - each item
-// carries a unique id, so it's only ever added once per date, regardless of what else
-// is already in that day's log.
-const pendingAdditions = [
-  {date:'2026-08-04', entry:{id:'chat-2026-08-04-breakfast', name:'Premier Protein shake (breakfast)', calories:160, protein:30, carbs:4, fat:3, fiber:1}},
-  {date:'2026-08-04', entry:{id:'chat-2026-08-04-lunch1', name:'California BLT', calories:650, protein:20, carbs:48, fat:38, fiber:5}},
-  {date:'2026-08-04', entry:{id:'chat-2026-08-04-lunch2', name:"Lay's Sour Cream & Onion (small bag)", calories:160, protein:2, carbs:15, fat:10, fiber:1}},
-];
-
-async function applyPendingAdditions(){
-  const byDate = {};
-  pendingAdditions.forEach(p => {
-    if(!byDate[p.date]) byDate[p.date] = [];
-    byDate[p.date].push(p.entry);
-  });
-
-  for(const dateStr of Object.keys(byDate)){
-    let list;
-    try{
-      const res = await window.storage.get('entries:' + dateStr, false);
-      list = res && res.value ? JSON.parse(res.value) : [];
-    }catch(e){
-      list = [];
-    }
-    let changed = false;
-    byDate[dateStr].forEach(entry => {
-      if(!list.some(e => e.id === entry.id)){
-        list.push(entry);
-        changed = true;
-      }
-    });
-    if(changed){
-      try{ await window.storage.set('entries:' + dateStr, JSON.stringify(list), false); }catch(e){}
-    }
-  }
-}
-
-// Fixed historical data for 8/3, seeded independently of "today" so it can never be
-// accidentally overwritten by later changes to seedEntries above.
-const historicalSeeds = {
-  '2026-08-03': [
-    {id:'hist-2026-08-03-1', name:'Protein shake (breakfast)', calories:150, protein:30, carbs:3, fat:1, fiber:1},
-    {id:'hist-2026-08-03-2', name:'Cheerios (1.5 bowls) + whole milk', calories:350, protein:13, carbs:49, fat:12, fiber:3},
-    {id:'hist-2026-08-03-3', name:'CFA Grilled Nuggets (12ct)', calories:145, protein:25, carbs:2, fat:3, fiber:0},
-    {id:'hist-2026-08-03-4', name:'2 rice cakes', calories:70, protein:1.5, carbs:15, fat:0, fiber:1},
-    {id:'hist-2026-08-03-5', name:'Chick-fil-A sauce', calories:140, protein:0, carbs:4, fat:13, fiber:0},
-    {id:'hist-2026-08-03-6', name:'Protein shake (dinner)', calories:150, protein:30, carbs:3, fat:1, fiber:1},
-  ],
-};
-
-async function seedHistoricalDates(){
-  for(const dateStr of Object.keys(historicalSeeds)){
-    let existing = null;
-    try{
-      const res = await window.storage.get('entries:' + dateStr, false);
-      existing = res && res.value ? JSON.parse(res.value) : null;
-    }catch(e){
-      existing = null; // key doesn't exist yet
-    }
-    const isEmpty = !existing || !Array.isArray(existing) || existing.length === 0;
-    if(isEmpty){
-      try{
-        await window.storage.set('entries:' + dateStr, JSON.stringify(historicalSeeds[dateStr]), false);
-      }catch(e2){}
-    }
-  }
-}
-
 // Rough fiber-per-item lookup used to backfill entries logged before fiber tracking existed.
 // Matches on keywords in the entry name (lowercased). Falls back to 0 if nothing matches.
 function estimateFiber(name){
@@ -631,9 +562,32 @@ async function migrateFiberForDay(dateStr, list){
   return patched;
 }
 
+// One-time cleanup: strip out fake demo entries a previous version of this app
+// auto-seeded into every browser's own storage on 8/3 and 8/4. Safe to run on
+// every load - it's a no-op once those IDs are gone.
+const legacySeedIds = new Set([
+  'chat-2026-08-04-breakfast', 'chat-2026-08-04-lunch1', 'chat-2026-08-04-lunch2',
+  'hist-2026-08-03-1', 'hist-2026-08-03-2', 'hist-2026-08-03-3',
+  'hist-2026-08-03-4', 'hist-2026-08-03-5', 'hist-2026-08-03-6',
+]);
+
+async function removeLegacySeedEntries(){
+  for(const dateStr of ['2026-08-03', '2026-08-04']){
+    let list;
+    try{
+      const res = await window.storage.get('entries:' + dateStr, false);
+      list = res && res.value ? JSON.parse(res.value) : null;
+    }catch(e){ list = null; }
+    if(!Array.isArray(list)) continue;
+    const cleaned = list.filter(e => !legacySeedIds.has(e.id));
+    if(cleaned.length !== list.length){
+      try{ await window.storage.set('entries:' + dateStr, JSON.stringify(cleaned), false); }catch(e){}
+    }
+  }
+}
+
 async function loadData(){
-  await seedHistoricalDates();
-  await applyPendingAdditions();
+  await removeLegacySeedEntries();
 
   try{
     const res = await window.storage.get('entries:' + today, false);
@@ -641,7 +595,7 @@ async function loadData(){
   }catch(e){ entries = null; }
 
   if(entries === null){
-    entries = historicalSeeds[today] || [];
+    entries = [];
     await saveEntries();
   } else {
     entries = await migrateFiberForDay(today, entries);
