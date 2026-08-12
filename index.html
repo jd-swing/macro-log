@@ -164,8 +164,41 @@
     width:100%;
   }
   input:focus{outline:2px solid var(--ink);outline-offset:1px;}
+  input[type="checkbox"]{width:auto;}
   .field-row input[data-w="wide"]{flex:2;}
   .field-row input[data-w="narrow"]{flex:1;}
+  .check-row{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-size:12px;
+    color:var(--muted);
+    margin-bottom:10px;
+  }
+  .chip-row{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  .chip{
+    background:var(--paper);
+    border:1px solid #cfcac0;
+    border-radius:999px;
+    padding:7px 12px;
+    font-size:13px;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .chip:active{opacity:0.75;}
+  .chip .chip-cal{color:var(--muted);font-size:11px;}
+  .chip .chip-remove{
+    color:#b33;
+    font-weight:700;
+    margin-left:2px;
+    line-height:1;
+  }
   select{
     font-family:'Inter',sans-serif;
     border:1px solid #cfcac0;
@@ -382,6 +415,13 @@
     <button class="primary" id="saveGoalsBtn">Save Goals</button>
   </div>
 
+  <div class="section-label">Quick Add</div>
+  <div class="card" id="quickAddCard">
+    <div class="chip-row" id="favoriteChips"></div>
+    <div class="empty hidden" id="favoritesEmpty">No favorites yet — save one from Add Entry below.</div>
+    <div class="toggle-link" id="manageFavoritesLink">manage favorites</div>
+  </div>
+
   <div class="section-label">Add Entry</div>
   <div class="card">
     <div class="field-row"><input type="text" id="fName" placeholder="Food / meal name" data-w="wide"></div>
@@ -396,6 +436,7 @@
     <div class="field-row">
       <div style="flex:1"><label>Fiber (g)</label><input type="number" id="fFiber"></div>
     </div>
+    <label class="check-row"><input type="checkbox" id="fSaveFavorite"> ☆ Save as favorite</label>
     <button class="primary" id="addBtn">Add to Today's Log</button>
   </div>
 
@@ -470,6 +511,8 @@ document.getElementById('dateLabel').textContent = new Date().toLocaleDateString
 let entries = [];
 let goals = null;
 let profile = null;
+let favorites = [];
+let manageFavorites = false;
 
 // Mifflin-St Jeor BMR -> TDEE -> calorie/macro targets from a height/weight/age/sex/activity profile.
 function computeGoalsFromProfile(p){
@@ -651,7 +694,62 @@ async function loadData(){
     document.getElementById('onboardingCard').classList.remove('hidden');
   }
 
+  try{
+    const favres = await window.storage.get('favorites', false);
+    favorites = favres && favres.value ? JSON.parse(favres.value) : [];
+  }catch(e){ favorites = []; }
+  renderFavorites();
+
   render();
+}
+
+async function saveFavorites(){
+  try{
+    await window.storage.set('favorites', JSON.stringify(favorites), false);
+  }catch(e){
+    setStatus('Could not save favorites');
+  }
+}
+
+function renderFavorites(){
+  const row = document.getElementById('favoriteChips');
+  const emptyEl = document.getElementById('favoritesEmpty');
+  emptyEl.classList.toggle('hidden', favorites.length > 0);
+
+  row.innerHTML = favorites.map(f => `
+    <div class="chip" data-id="${f.id}">
+      <span>${escapeHtml(f.name)} <span class="chip-cal">${f.calories} cal</span></span>
+      ${manageFavorites ? '<span class="chip-remove">×</span>' : ''}
+    </div>
+  `).join('');
+
+  row.querySelectorAll('.chip').forEach(chip => {
+    chip.addEventListener('click', (ev) => {
+      const id = chip.getAttribute('data-id');
+      if(manageFavorites){
+        removeFavorite(id);
+      } else {
+        quickAddFavorite(id);
+      }
+    });
+  });
+
+  document.getElementById('manageFavoritesLink').textContent = manageFavorites ? 'done managing' : 'manage favorites';
+}
+
+async function quickAddFavorite(id){
+  const fav = favorites.find(f => f.id === id);
+  if(!fav) return;
+  entries.push({id:'e-'+Date.now(), name:fav.name, calories:fav.calories, protein:fav.protein, carbs:fav.carbs, fat:fav.fat, fiber:fav.fiber});
+  await saveEntries();
+  render();
+  setStatus('Added ' + fav.name);
+}
+
+async function removeFavorite(id){
+  favorites = favorites.filter(f => f.id !== id);
+  await saveFavorites();
+  renderFavorites();
 }
 
 async function saveEntries(){
@@ -749,15 +847,29 @@ document.getElementById('addBtn').addEventListener('click', async ()=>{
   const carbs = Number(document.getElementById('fCarbs').value)||0;
   const fat = Number(document.getElementById('fFat').value)||0;
   const fiber = Number(document.getElementById('fFiber').value)||0;
+  const saveFavorite = document.getElementById('fSaveFavorite').checked;
 
   if(!name){ setStatus('Give it a name first'); return; }
 
   entries.push({id:'e-'+Date.now(), name, calories:cal, protein, carbs, fat, fiber});
   await saveEntries();
+
+  if(saveFavorite){
+    favorites.push({id:'fav-'+Date.now(), name, calories:cal, protein, carbs, fat, fiber});
+    await saveFavorites();
+    renderFavorites();
+  }
+
   render();
 
   ['fName','fCal','fProtein','fCarbs','fFat','fFiber'].forEach(id => document.getElementById(id).value = '');
-  setStatus('Added');
+  document.getElementById('fSaveFavorite').checked = false;
+  setStatus(saveFavorite ? 'Added and saved as favorite' : 'Added');
+});
+
+document.getElementById('manageFavoritesLink').addEventListener('click', ()=>{
+  manageFavorites = !manageFavorites;
+  renderFavorites();
 });
 
 document.getElementById('editGoalsLink').addEventListener('click', ()=>{
