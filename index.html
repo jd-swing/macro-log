@@ -581,7 +581,13 @@ async function removeLegacySeedEntries(){
     if(!Array.isArray(list)) continue;
     const cleaned = list.filter(e => !legacySeedIds.has(e.id));
     if(cleaned.length !== list.length){
-      try{ await window.storage.set('entries:' + dateStr, JSON.stringify(cleaned), false); }catch(e){}
+      try{
+        if(cleaned.length === 0){
+          await window.storage.delete('entries:' + dateStr);
+        } else {
+          await window.storage.set('entries:' + dateStr, JSON.stringify(cleaned), false);
+        }
+      }catch(e){}
     }
   }
 }
@@ -708,7 +714,11 @@ async function removeFavorite(id){
 
 async function saveEntries(){
   try{
-    await window.storage.set('entries:' + today, JSON.stringify(entries), false);
+    if(entries.length === 0){
+      await window.storage.delete('entries:' + today);
+    } else {
+      await window.storage.set('entries:' + today, JSON.stringify(entries), false);
+    }
   }catch(e){
     setStatus('Could not save — try again');
   }
@@ -1023,7 +1033,10 @@ const _origSaveEntries = saveEntries;
 saveEntries = async function(){
   await _origSaveEntries();
   historyCache[today] = null;
-  if(allLoggedKeys) allLoggedKeys.add(today);
+  if(allLoggedKeys){
+    if(entries.length > 0) allLoggedKeys.add(today);
+    else allLoggedKeys.delete(today);
+  }
   renderCalendar();
 };
 
