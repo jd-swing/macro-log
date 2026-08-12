@@ -1,8 +1,8 @@
 // Simple offline cache for the Macro Log PWA.
-// Standard update flow: a new deploy is picked up on the *second* open after
-// you push a change (browser default behavior) - no forced fast-update.
+// Network-first: always tries to fetch the latest version so pushed updates
+// show up on next load, falling back to the cached copy only when offline.
 
-const CACHE_NAME = 'macro-log-v1';
+const CACHE_NAME = 'macro-log-v2';
 const FILES_TO_CACHE = [
   './index.html',
   './manifest.json',
@@ -11,6 +11,7 @@ const FILES_TO_CACHE = [
 ];
 
 self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(FILES_TO_CACHE))
   );
@@ -22,24 +23,18 @@ self.addEventListener('activate', (event) => {
       Promise.all(
         keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
       )
-    )
+    ).then(() => self.clients.claim())
   );
 });
 
 self.addEventListener('fetch', (event) => {
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      return (
-        cached ||
-        fetch(event.request).then((response) => {
-          // Cache a copy of any newly-fetched same-origin file for next time offline
-          if (event.request.method === 'GET' && response && response.status === 200) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-          }
-          return response;
-        }).catch(() => cached)
-      );
-    })
+    fetch(event.request).then((response) => {
+      if (event.request.method === 'GET' && response && response.status === 200) {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+      }
+      return response;
+    }).catch(() => caches.match(event.request))
   );
 });
