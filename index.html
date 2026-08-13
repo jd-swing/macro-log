@@ -1032,7 +1032,7 @@ document.getElementById('nextMonth').addEventListener('click', ()=>{
 const _origSaveEntries = saveEntries;
 saveEntries = async function(){
   await _origSaveEntries();
-  delete historyCache[today];
+  historyCache[today] = null;
   if(allLoggedKeys){
     if(entries.length > 0) allLoggedKeys.add(today);
     else allLoggedKeys.delete(today);
